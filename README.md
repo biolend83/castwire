@@ -155,11 +155,18 @@ sample/build/install/sample/bin/sample play "Living room" https://example.com/vi
 sample/build/install/sample/bin/sample play 192.168.1.50 ./holiday.mp4
 ```
 
+## Tested on
+
+- Google TV (innos 2K F Google TV): discovery, playback of a local file through the relay, controls, status
+
+Tell us what works on yours in an issue: the device model and the `-v` log of the sample app.
+
 ## Troubleshooting
 
 - **No devices found:** the phone or computer must be on the same network as the TV, not a guest
   network, and the router must pass multicast (some mesh systems and "AP isolation" settings don't).
-  `CastDevice.at(ip)` skips discovery. On Windows, allow Java through the firewall.
+  `CastDevice.at(ip)` skips discovery. On Windows, allow Java through the firewall. A TV in standby may not
+  answer until it is woken; run the sample with `-v` to see which devices answer.
 - **The TV shows an error for relayed media:** the TV must reach this device. VPNs on the phone, or a
   desktop firewall blocking incoming connections, get in the way.
 
