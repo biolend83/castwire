@@ -12,5 +12,4 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
       - run: ./gradlew --no-daemon :castwire:test :castwire-android:assembleRelease :sample:installDist
