@@ -151,12 +151,6 @@ sample/build/install/sample/bin/sample play "Living room" https://example.com/vi
 sample/build/install/sample/bin/sample play 192.168.1.50 ./holiday.mp4
 ```
 
-## Tested on
-
-- Google TV (innos 2K F Google TV): discovery, playback of a local file through the relay, controls, status
-
-Tell us what works on yours in an issue: the device model and the `-v` log of the sample app.
-
 ## Troubleshooting
 
 - **No devices found:** the phone or computer must be on the same network as the TV, not a guest
