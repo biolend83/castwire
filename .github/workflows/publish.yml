@@ -1,5 +1,8 @@
 name: Publish to Maven Central
-# a tag v<version> (matching the version in build.gradle.kts) publishes that version
+# a tag v<version> (matching the version in build.gradle.kts) publishes that version.
+# Needs two secrets, the Sonatype user token: MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_PASSWORD.
+# The signature comes from a key made here for each release and put on the public key servers,
+# where Maven Central checks it (no signing key to keep anywhere).
 on:
   push:
     tags: ["v*"]
@@ -13,10 +16,22 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Signing key for this release
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"; mkdir -m 700 -p "$GNUPGHOME"
+          gpg --batch --pinentry-mode loopback --passphrase '' --quick-gen-key "Castwire release ${GITHUB_REF_NAME} <258010694+biolend83@users.noreply.github.com>" ed25519 sign 0
+          id=$(gpg --list-keys --with-colons | awk -F: '/^fpr:/ { print $10; exit }')
+          for s in keyserver.ubuntu.com keys.openpgp.org pgp.mit.edu; do gpg --keyserver "hkps://$s" --send-keys "$id" || true; done
+          {
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKey<<KEY"
+            gpg --armor --export-secret-keys "$id"
+            echo "KEY"
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="
+          } >> "$GITHUB_ENV"
+          # the key servers share keys with each other within a minute or two
+          sleep 90
       - name: Publish
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --no-configuration-cache :castwire:test publishAndReleaseToMavenCentral
