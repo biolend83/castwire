@@ -79,7 +79,7 @@ class Castwire(private val config: CastwireConfig = CastwireConfig()) : AutoClos
     private fun discoverInto(durationMs: Long, found: (CastDevice) -> Unit) {
         runCatching { config.multicast(true) }
         try {
-            Mdns.discover(durationMs, found)
+            Mdns.discover(durationMs, config.log, found)
         } catch (e: Exception) {
             config.log?.invoke("discovery failed: $e")
         } finally {

@@ -27,16 +27,19 @@ internal object Mdns {
     const val SERVICE = "_googlecast._tcp.local"
 
     /** asks for [ms] milliseconds; [found] runs once per device, on a background thread */
-    fun discover(ms: Long, found: (CastDevice) -> Unit) {
+    fun discover(ms: Long, log: ((String) -> Unit)? = null, found: (CastDevice) -> Unit) {
         val seen = HashSet<String>()
         val lock = Any()
         val deliver = { p: DatagramPacket ->
-            for (d in parse(p.data, p.length, p.address.hostAddress ?: "")) {
+            val got = parse(p.data, p.length, p.address.hostAddress ?: "")
+            log?.invoke("mdns: ${p.length} bytes from ${p.address.hostAddress}:${p.port}, ${got.size} cast device(s)" + if (got.isEmpty()) " [" + names(p.data, p.length).take(6).joinToString() + "]" else "")
+            for (d in got) {
                 val fresh = synchronized(lock) { seen.add(d.id) }
                 if (fresh) runCatching { found(d) }
             }
         }
         val nets = interfaces()
+        log?.invoke("mdns: networks " + nets.joinToString { it.first.name + "=" + it.second.hostAddress }.ifEmpty { "none" })
         val sockets = ArrayList<MulticastSocket>()
         for ((nif, addr) in nets) runCatching {
             sockets += MulticastSocket(InetSocketAddress(addr, 0)).apply {
@@ -53,7 +56,8 @@ internal object Mdns {
                 timeToLive = 255
                 for ((nif, _) in nets) runCatching { joinGroup(InetSocketAddress(GROUP, PORT), nif) }
             }
-        }.getOrNull()
+        }.onFailure { log?.invoke("mdns: port 5353 not available ($it); asking from ordinary ports only") }.getOrNull()
+        log?.invoke("mdns: ${sockets.size} query socket(s), group socket " + if (group != null) "open" else "closed")
         if (sockets.isEmpty() && group == null) return
         val qm = query(false)
         val qu = query(true)
@@ -108,6 +112,23 @@ internal object Mdns {
         b.write(byteArrayOf(0, 12, if (unicast) 0x80.toByte() else 0, 1))   // PTR, class IN (and QU)
         return b.toByteArray()
     }
+
+    /** the record names in a packet, for the diagnostics log */
+    private fun names(p: ByteArray, n: Int): List<String> = runCatching {
+        if (n < 12) return emptyList()
+        val count = (((p[6].toInt() and 0xff) shl 8) or (p[7].toInt() and 0xff))
+        var i = 12
+        val qd = ((p[4].toInt() and 0xff) shl 8) or (p[5].toInt() and 0xff)
+        repeat(qd) { i = name(p, n, i).second + 4 }
+        val out = ArrayList<String>()
+        repeat(count) {
+            val (nm, next) = name(p, n, i)
+            out += nm
+            i = next + 10 + (((p[next + 8].toInt() and 0xff) shl 8) or (p[next + 9].toInt() and 0xff))
+            if (i > n) return@runCatching out
+        }
+        out
+    }.getOrDefault(emptyList())
 
     private class Rec(val name: String, val type: Int, val at: Int, val len: Int)
 

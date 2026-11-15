@@ -33,7 +33,7 @@ fun main(args: Array<String>): Unit = runBlocking {
             println("Looking for Cast devices...")
             val list = cast.discover()
             if (list.isEmpty()) println("None found. (Same network? Multicast allowed by the router and firewall?)")
-            for (d in list) println("  ${d.name}  —  ${d.model.ifEmpty { "?" }}  ${d.host}:${d.port}${if (d.isGroup) "  (group)" else ""}")
+            for (d in list) println("  ${d.name}  -  ${d.model.ifEmpty { "?" }}  ${d.host}:${d.port}${if (d.isGroup) "  (group)" else ""}")
         }
         "play" -> {
             val target = a.getOrNull(1) ?: usage()
@@ -58,8 +58,8 @@ fun main(args: Array<String>): Unit = runBlocking {
                 ".m3u8" in what -> CastSource.Hls(what)
                 else -> CastSource.Url(what, contentTypeOf(what.substringBefore('?')).takeIf { it != "application/octet-stream" } ?: "video/mp4")
             }
-            val status = session.load(CastMedia(source, MediaMetadata(title), if (source is CastSource.Hls) StreamType.LIVE else StreamType.BUFFERED))
-            println("Playing (${status.playerState}). p = pause/play, s <sec> = seek, v <0-100> = volume, q = quit")
+            session.load(CastMedia(source, MediaMetadata(title), if (source is CastSource.Hls) StreamType.LIVE else StreamType.BUFFERED))
+            println("Sent to ${device.name}. p = pause/play, s <sec> = seek, v <0-100> = volume, q = quit")
             while (true) {
                 val line = readLine()?.trim() ?: break
                 when {
