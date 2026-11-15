@@ -19,6 +19,6 @@ licenses.
 
 ## Code
 
-- No new dependencies in `castwire` beyond kotlinx-coroutines.
+- No new dependencies in `castwire` beyond kotlinx-coroutines, kotlinx-serialization-json and OkHttp.
 - Java 8 bytecode: no APIs above Android API 24.
 - `./gradlew :castwire:test` must pass.

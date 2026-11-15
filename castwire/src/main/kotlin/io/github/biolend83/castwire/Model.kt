@@ -52,7 +52,7 @@ data class CastMedia(
  * A TV fetches media itself, from its own address, as a web page would: it can't send cookies or
  * headers, it gets no access to files on the phone, and it needs CORS headers some servers don't
  * send. Sources with `relay = true` (and every [File]) are served to the TV by this device instead,
- * through [LocalRelay]; plain public URLs go to the TV directly.
+ * by Castwire's relay (TubeHaus's CastServer); plain public URLs go to the TV directly.
  */
 sealed class CastSource {
     /** a single file: MP4, WebM, MP3, AAC, an image... */

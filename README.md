@@ -2,7 +2,7 @@
 
 **Google Cast for Kotlin and Java, without Google's SDK.** Find Chromecasts, Google TVs and TVs with
 Cast built in, and play video, music, live streams and local files on them, from Android, Windows,
-macOS and Linux. No Play Services, no native code, one dependency (kotlinx-coroutines).
+macOS and Linux. No Play Services, no native code: kotlinx-coroutines, kotlinx-serialization-json and OkHttp.
 
 ```kotlin
 val castwire = Castwire()                       // on Android: AndroidCastwire.create(context)
@@ -16,8 +16,8 @@ session.pause(); session.seek(90_000); session.setVolume(0.4f)
 session.close()
 ```
 
-Castwire came out of [TubeHaus](https://github.com/biolend83/tubehaus), where it casts YouTube to TVs
-from the Android and desktop apps.
+Castwire is the Cast code of [TubeHaus](https://github.com/biolend83/tubehaus) (its Android and desktop
+apps cast YouTube to TVs with it), taken out as a library: the same discovery, connection and relay.
 
 ## Why
 
@@ -128,14 +128,10 @@ LaunchedEffect(Unit) { castwire.scan() }
 
 ## Your own HTTP client
 
-The relay fetches with `HttpURLConnection` unless you pass an `HttpFetcher`, for example to reuse
-OkHttp's pool and your user agent:
+The relay fetches with OkHttp. Pass your app's client to share its connection pool, proxy and user agent:
 
 ```kotlin
-Castwire(CastwireConfig(fetcher = HttpFetcher { url, headers ->
-    val r = client.newCall(Request.Builder().url(url).headers(headers.toHeaders()).build()).execute()
-    HttpResponse(r.code, { r.header(it) }, r.body!!.contentLength(), r.body!!.byteStream(), r)
-}))
+Castwire(CastwireConfig(httpClient = myOkHttpClient))
 ```
 
 ## Custom receivers
@@ -143,7 +139,7 @@ Castwire(CastwireConfig(fetcher = HttpFetcher { url, headers ->
 ```kotlin
 val session = castwire.connect(device, appId = "YOUR_APP_ID")
 session.send("urn:x-cast:com.example.game", mapOf("move" to "e4"))
-session.messages("urn:x-cast:com.example.game").collect { msg -> }
+session.messages("urn:x-cast:com.example.game").collect { json -> }
 ```
 
 ## Try it from the command line
