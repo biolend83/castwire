@@ -158,6 +158,8 @@ class CastSession internal constructor(
         val dur = m.obj("media")?.num("duration")?.takeIf { it > 0 }?.let { (it * 1000).toLong() }
         val ended = ps == "IDLE" && idle == "FINISHED"
         val cur = st.value
+        // the TV answers a LOAD at once with IDLE and no reason while it still fetches the media
+        if (ps == "IDLE" && idle == null && cur.playerState == PlayerState.LOADING) return
         val wasEnded = cur.isFinished
         st.value = cur.copy(
             playerState = when (ps) {
@@ -203,6 +205,14 @@ class CastSession internal constructor(
         loadLock.withLock {
             val t = transport ?: throw CastException("not connected")
             loading = true
+            this@CastSession.media = null
+            st.value = MediaStatus(
+                playerState = PlayerState.LOADING,
+                positionMs = startPositionMs,
+                durationMs = ((media.durationSec ?: 0.0) * 1000).toLong(),
+                activeTrackIds = activeTrackIds,
+                receivedAtMs = nowMs(),
+            )
             try {
                 val base = server.base(device.host)
                 val info = mediaInfo(media, base)
@@ -271,38 +281,49 @@ class CastSession internal constructor(
 
     // ------------------------------------------------------------------ controls
 
-    private fun cmd(type: String, extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {}) {
-        val t = transport ?: return
-        val m = media ?: return
-        ch?.send(NS_MEDIA, t, json { put("type", type); put("mediaSessionId", m); extra() })
+    /** false when there is nothing to send it to yet (the TV hasn't reported the media) */
+    private fun cmd(type: String, extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {}): Boolean {
+        val t = transport ?: return false
+        val m = media ?: return false
+        val c = ch ?: return false
+        c.send(NS_MEDIA, t, json { put("type", type); put("mediaSessionId", m); extra() })
+        return true
     }
 
-    fun play() {
-        if (st.value.isFinished) { seek(0); cmd("PLAY") } else cmd("PLAY")
-        st.value = st.value.copy(playerState = PlayerState.PLAYING, idleReason = null, positionMs = positionMs(), receivedAtMs = nowMs())
+    /** false when the TV can't take it yet (still loading); the same for the controls below */
+    fun play(): Boolean {
+        if (st.value.isFinished) seek(0)
+        if (!cmd("PLAY")) return false
+        // still loading: the TV reports when it really plays
+        if (st.value.playerState != PlayerState.LOADING) st.value = st.value.copy(playerState = PlayerState.PLAYING, idleReason = null, positionMs = positionMs(), receivedAtMs = nowMs())
+        return true
     }
 
-    fun pause() {
+    fun pause(): Boolean {
         val p = positionMs()
-        cmd("PAUSE")
-        st.value = st.value.copy(playerState = PlayerState.PAUSED, positionMs = p, receivedAtMs = nowMs())
+        if (!cmd("PAUSE")) return false
+        if (st.value.playerState != PlayerState.LOADING) st.value = st.value.copy(playerState = PlayerState.PAUSED, positionMs = p, receivedAtMs = nowMs())
+        return true
     }
 
-    fun seek(positionMs: Long) {
-        cmd("SEEK") { put("currentTime", positionMs / 1000.0) }
+    fun seek(positionMs: Long): Boolean {
+        if (!cmd("SEEK") { put("currentTime", positionMs / 1000.0) }) return false
         st.value = st.value.copy(positionMs = positionMs, receivedAtMs = nowMs())
+        return true
     }
 
     /** 0.5 to 2.0 on most devices */
-    fun setPlaybackRate(rate: Double) {
-        cmd("SET_PLAYBACK_RATE") { put("playbackRate", rate) }
+    fun setPlaybackRate(rate: Double): Boolean {
+        if (!cmd("SET_PLAYBACK_RATE") { put("playbackRate", rate) }) return false
         st.value = st.value.copy(positionMs = positionMs(), playbackRate = rate, receivedAtMs = nowMs())
+        return true
     }
 
     /** shows the text tracks with these ids (from [CastMedia.textTracks]); empty hides them all */
-    fun setActiveTracks(ids: List<Int>) {
-        cmd("EDIT_TRACKS_INFO") { putJsonArray("activeTrackIds") { for (id in ids) add(id) } }
+    fun setActiveTracks(ids: List<Int>): Boolean {
+        if (!cmd("EDIT_TRACKS_INFO") { putJsonArray("activeTrackIds") { for (id in ids) add(id) } }) return false
         st.value = st.value.copy(activeTrackIds = ids)
+        return true
     }
 
     /** stops the media; the player stays open on the TV for the next [load] */

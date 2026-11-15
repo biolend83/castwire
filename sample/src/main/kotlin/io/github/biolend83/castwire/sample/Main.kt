@@ -63,8 +63,8 @@ fun main(args: Array<String>): Unit = runBlocking {
             while (true) {
                 val line = readLine()?.trim() ?: break
                 when {
-                    line == "p" -> if (session.status.value.isPlaying) session.pause() else session.play()
-                    line.startsWith("s ") -> line.substring(2).trim().toLongOrNull()?.let { session.seek(it * 1000) }
+                    line == "p" -> if (!(if (session.status.value.isPlaying) session.pause() else session.play())) println("  (the TV is still loading)")
+                    line.startsWith("s ") -> line.substring(2).trim().toLongOrNull()?.let { if (!session.seek(it * 1000)) println("  (the TV is still loading)") }
                     line.startsWith("v ") -> line.substring(2).trim().toIntOrNull()?.let { session.setVolume(it / 100f) }
                     line == "q" -> break
                     line.isEmpty() -> println("  ${session.status.value.playerState} ${session.positionMs() / 1000}s / ${session.status.value.durationMs / 1000}s")
